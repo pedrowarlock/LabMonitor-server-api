@@ -1,0 +1,45 @@
+{
+  "name": "@monitoramento/api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "predev": "prisma generate",
+    "dev": "tsx watch src/server.ts",
+    "prebuild": "prisma generate",
+    "build": "tsc -p tsconfig.json",
+    "db:generate": "dotenv -e ../../.env -- prisma generate",
+    "db:push": "dotenv -e ../../.env -- prisma db push && dotenv -e ../../.env -- prisma generate",
+    "db:seed": "prisma generate && tsx prisma/seed.ts",
+    "simulate:device": "tsx src/scripts/simulate-device.ts",
+    "test": "tsx --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^10.0.2",
+    "@fastify/helmet": "^13.1.1",
+    "@fastify/rate-limit": "^10.2.1",
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "@whiskeysockets/baileys": "^6.7.24",
+    "argon2": "^0.41.1",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.3.3",
+    "nodemailer": "^7.0.3",
+    "pg": "^8.16.3",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.5",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "@types/nodemailer": "^6.4.17",
+    "@types/qrcode": "^1.5.6",
+    "dotenv-cli": "^8.0.0",
+    "@types/pg": "^8.15.5",
+    "prisma": "^7.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}
