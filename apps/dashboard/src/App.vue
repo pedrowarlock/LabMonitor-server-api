@@ -670,9 +670,8 @@ const englishText: Record<string, string> = {
   'Aparelho não vinculado à sua conta.': 'This device is not linked to your account.',
   'Você não tem permissão para mover este aparelho.': 'You do not have permission to move this device.',
   'Só o proprietário pode adicionar ou mover aparelhos neste ambiente.': 'Only the workspace owner can add or move devices in this workspace.',
-  'Só o proprietário pode mover aparelhos para fora deste ambiente.': 'Only the workspace owner can move devices out of this workspace.',
   'Só o proprietário pode remover aparelhos deste ambiente.': 'Only the workspace owner can remove devices from this workspace.',
-  'Você não é proprietário deste ambiente. Pode importá-lo e receber notificações, mas não gerenciar seus aparelhos.': 'You do not own this workspace. You can import it and receive notifications, but cannot manage its devices.',
+  'Você não tem permissão para gerenciar este aparelho.': 'You do not have permission to manage this device.',
   'Você não possui ambientes próprios.': 'You do not own any workspaces.',
   'Gerenciamento de aparelhos': 'Device management',
   'Aparelhos de monitoramento vinculados à sua conta': 'Monitoring devices linked to your account',
@@ -4413,7 +4412,7 @@ onUnmounted(() => {
 
         <div v-else-if="workspaceDialogAction === 'devices'" class="settings-pane workspace-manager-pane">
           <h3 class="workspace-devices-title">{{ t('Aparelhos de monitoramento vinculados à sua conta') }}</h3>
-          <p class="form-subtitle">{{ t('Escolha o ambiente de destino para adicionar ou mover seus aparelhos vinculados.') }} {{ t('Você também pode remover um aparelho do ambiente sem excluí-lo da sua conta.') }} {{ t('Você não é proprietário deste ambiente. Pode importá-lo e receber notificações, mas não gerenciar seus aparelhos.') }}</p>
+          <p class="form-subtitle">{{ t('Escolha o ambiente de destino para adicionar ou mover seus aparelhos vinculados.') }} {{ t('Você também pode remover um aparelho do ambiente sem excluí-lo da sua conta.') }}</p>
           <label for="workspaceDeviceTarget">{{ t('Selecionar ambiente de destino') }}</label>
           <select id="workspaceDeviceTarget" v-model="workspaceDeviceTargetId" class="settings-input select-input">
             <option v-if="!ownedWorkspaces.length" :value="null" disabled>{{ t('Você não possui ambientes próprios.') }}</option>
@@ -4435,7 +4434,7 @@ onUnmounted(() => {
                 </button>
                 <button v-if="device.workspaceId && device.canAssign" class="secondary-button workspace-device-action workspace-device-remove-action" type="button" @click="removeAccountDeviceFromWorkspace(device)">{{ t('Remover do ambiente') }}</button>
               </div>
-              <p v-else class="workspace-device-access-note">{{ t('Você não é proprietário deste ambiente. Pode importá-lo e receber notificações, mas não gerenciar seus aparelhos.') }}</p>
+              <p v-else class="workspace-device-access-note">{{ t('Você não tem permissão para gerenciar este aparelho.') }}</p>
               <div v-if="device.canUnlink" class="workspace-device-actions">
                 <button class="secondary-button workspace-device-action workspace-device-remove-action" type="button" :disabled="accountDeviceUnlinkingId === device.id" @click="unlinkAccountDevice(device)">{{ accountDeviceUnlinkingId === device.id ? t('Desvinculando...') : t('Desvincular da conta') }}</button>
               </div>

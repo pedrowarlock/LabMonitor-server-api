@@ -2326,7 +2326,6 @@ app.patch<{ Params: { id: string } }>('/api/devices/:id/alias', async (request, 
 app.get('/api/account/devices', async (request, reply) => {
   const auth = await requireSession(request, reply);
   if (!auth) return;
-  const workspaceRoles = new Map(auth.user.workspaces.map((workspace) => [workspace.id, workspace.role]));
   const deviceRelations = { workspace: { select: { id: true, name: true } }, deviceLink: { select: { userId: true } } };
   const [links, accessibleDevices, orphanedDevices] = await Promise.all([
     prisma.deviceLink.findMany({
@@ -2363,7 +2362,6 @@ app.get('/api/account/devices', async (request, reply) => {
       canUnlink: !isDemoSensorExternalId(device.externalId)
         && (device.deviceLink?.userId === auth.user.id || device.ownerUserId === auth.user.id),
       canAssign: (device.ownerUserId === auth.user.id || device.deviceLink?.userId === auth.user.id)
-        && (!device.workspaceId || workspaceRoles.get(device.workspaceId) === 'owner')
         || (auth.user.isPlatformAdmin && !device.ownerUserId && !device.deviceLink && !device.workspaceId)
     }))
   };
@@ -2429,11 +2427,7 @@ app.post<{ Params: { workspaceId: string } }>('/api/workspaces/:workspaceId/devi
     include: { deviceLink: { select: { userId: true } } }
   });
   if (!device) return reply.code(404).send({ error: 'Aparelho não encontrado.' });
-  const sourceRole = device.workspaceId ? getWorkspaceRole(auth.user, device.workspaceId) : null;
   const isAdminRecovery = auth.user.isPlatformAdmin && !device.ownerUserId && !device.deviceLink && !device.workspaceId;
-  if (device.workspaceId && sourceRole !== 'owner') {
-    return reply.code(403).send({ error: 'Só o proprietário pode mover aparelhos para fora deste ambiente.' });
-  }
   if (device.ownerUserId !== auth.user.id && device.deviceLink?.userId !== auth.user.id && !isAdminRecovery) {
     return reply.code(403).send({ error: 'Você não tem permissão para mover este aparelho.' });
   }

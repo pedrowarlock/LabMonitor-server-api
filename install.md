@@ -79,7 +79,7 @@ Abra o arquivo `.env` gerado e ajuste suas variáveis conforme as explicações 
 
 #### 👤 Usuário Administrador Inicial (Seed)
 - **`BOOTSTRAP_ADMIN_EMAIL`**: E-mail inicial do administrador do sistema que será criado na execução do comando `db:seed`.
-- **`BOOTSTRAP_ADMIN_PASSWORD`**: Senha inicial desse administrador (mínimo de 12 caracteres recomendados).
+- **`BOOTSTRAP_ADMIN_PASSWORD`**: Senha inicial desse administrador (obrigatória, com pelo menos 12 caracteres).
 
 #### 🪵 Logs e Diagnóstico
 - **`API_LOG_LEVEL`**: Nível mínimo de captura de logs do Pino (`fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`). Padrão: `info`.

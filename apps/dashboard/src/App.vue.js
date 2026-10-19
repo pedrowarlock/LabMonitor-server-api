@@ -567,9 +567,8 @@ const englishText = {
     'Aparelho não vinculado à sua conta.': 'This device is not linked to your account.',
     'Você não tem permissão para mover este aparelho.': 'You do not have permission to move this device.',
     'Só o proprietário pode adicionar ou mover aparelhos neste ambiente.': 'Only the workspace owner can add or move devices in this workspace.',
-    'Só o proprietário pode mover aparelhos para fora deste ambiente.': 'Only the workspace owner can move devices out of this workspace.',
     'Só o proprietário pode remover aparelhos deste ambiente.': 'Only the workspace owner can remove devices from this workspace.',
-    'Você não é proprietário deste ambiente. Pode importá-lo e receber notificações, mas não gerenciar seus aparelhos.': 'You do not own this workspace. You can import it and receive notifications, but cannot manage its devices.',
+    'Você não tem permissão para gerenciar este aparelho.': 'You do not have permission to manage this device.',
     'Você não possui ambientes próprios.': 'You do not own any workspaces.',
     'Gerenciamento de aparelhos': 'Device management',
     'Aparelhos de monitoramento vinculados à sua conta': 'Monitoring devices linked to your account',
@@ -11017,7 +11016,6 @@ else {
             });
             (__VLS_ctx.t('Escolha o ambiente de destino para adicionar ou mover seus aparelhos vinculados.'));
             (__VLS_ctx.t('Você também pode remover um aparelho do ambiente sem excluí-lo da sua conta.'));
-            (__VLS_ctx.t('Você não é proprietário deste ambiente. Pode importá-lo e receber notificações, mas não gerenciar seus aparelhos.'));
             __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
                 for: "workspaceDeviceTarget",
             });
@@ -11174,7 +11172,7 @@ else {
                         __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
                             ...{ class: "workspace-device-access-note" },
                         });
-                        (__VLS_ctx.t('Você não é proprietário deste ambiente. Pode importá-lo e receber notificações, mas não gerenciar seus aparelhos.'));
+                        (__VLS_ctx.t('Você não tem permissão para gerenciar este aparelho.'));
                     }
                     if (device.canUnlink) {
                         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
