@@ -1,5 +1,5 @@
 # Instalação e execução
-
+ 
 Este guia prepara o ambiente completo do Monitoramento de Laboratório: API Fastify, painel web Vue, banco PostgreSQL e, opcionalmente, o firmware para ESP32.
 
 ## 1. Requisitos
