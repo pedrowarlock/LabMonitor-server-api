@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { Capacitor } from '@capacitor/core';
+import { SecureStorage } from '@aparajita/capacitor-secure-storage';
 import { AsYouType, getCountries, getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
 import MessageTemplateEditor from './components/MessageTemplateEditor.vue';
 import {
@@ -114,6 +116,11 @@ const notificationOpen = ref(false);
 const csrfToken = ref('');
 const email = ref('');
 const password = ref('');
+const rememberCredentialsEnabled = ref(false);
+const rememberCredentialsUpdating = ref(false);
+const rememberCredentialsError = ref('');
+const rememberCredentialsAvailable = Capacitor.isNativePlatform();
+const rememberedCredentialsKey = 'login-credentials';
 const registerName = ref('');
 const registerEmail = ref('');
 const registerPassword = ref('');
@@ -375,6 +382,10 @@ const englishText: Record<string, string> = {
   'Senha': 'Password',
   'Sua senha': 'Your password',
   'Esqueci a senha': 'Forgot password',
+  'Salvar credenciais neste dispositivo': 'Save credentials on this device',
+  'Armazenadas com segurança neste aparelho.': 'Stored securely on this device.',
+  'Não foi possível acessar o armazenamento seguro do aparelho.': 'Could not access this device’s secure storage.',
+  'Não foi possível atualizar as credenciais salvas no aparelho.': 'Could not update the credentials saved on this device.',
   'Entrando...': 'Signing in...',
   'Entrar': 'Sign in',
   'Sessao protegida com criptografia': 'Session protected with encryption',
@@ -985,6 +996,46 @@ const englishText: Record<string, string> = {
 
 function t(text: string) {
   return language.value === 'en' ? englishText[text] ?? text : text;
+}
+
+function isRememberedCredentials(value: unknown): value is { email: string; password: string } {
+  return typeof value === 'object'
+    && value !== null
+    && !Array.isArray(value)
+    && 'email' in value
+    && typeof value.email === 'string'
+    && 'password' in value
+    && typeof value.password === 'string';
+}
+
+async function loadRememberedCredentials(): Promise<void> {
+  if (!rememberCredentialsAvailable) return;
+  rememberCredentialsError.value = '';
+  try {
+    const savedCredentials = await SecureStorage.get(rememberedCredentialsKey);
+    if (savedCredentials === null) return;
+    if (!isRememberedCredentials(savedCredentials)) throw new Error('Invalid saved credentials');
+    email.value = savedCredentials.email;
+    password.value = savedCredentials.password;
+    rememberCredentialsEnabled.value = true;
+  } catch {
+    rememberCredentialsError.value = 'Não foi possível acessar o armazenamento seguro do aparelho.';
+  }
+}
+
+async function updateRememberCredentials(): Promise<void> {
+  rememberCredentialsError.value = '';
+  if (rememberCredentialsEnabled.value || !rememberCredentialsAvailable || rememberCredentialsUpdating.value) return;
+  rememberCredentialsUpdating.value = true;
+  try {
+    await SecureStorage.remove(rememberedCredentialsKey);
+    password.value = '';
+  } catch {
+    rememberCredentialsEnabled.value = true;
+    rememberCredentialsError.value = 'Não foi possível acessar o armazenamento seguro do aparelho.';
+  } finally {
+    rememberCredentialsUpdating.value = false;
+  }
 }
 
 function interpolateNotificationTemplate(template: string, senderName: string, status: string) {
@@ -2486,6 +2537,7 @@ async function retryServerConnection() {
 async function login() {
   submitting.value = true;
   loginError.value = '';
+  rememberCredentialsError.value = '';
   try {
     const result = await api<{ user: User; csrfToken: string }>('/api/auth/login', {
       method: 'POST',
@@ -2495,6 +2547,15 @@ async function login() {
     user.value = result.user;
     csrfToken.value = result.csrfToken;
     syncProfileForm();
+    try {
+      if (rememberCredentialsAvailable && rememberCredentialsEnabled.value) {
+        await SecureStorage.set(rememberedCredentialsKey, { email: email.value, password: password.value });
+      } else if (rememberCredentialsAvailable) {
+        await SecureStorage.remove(rememberedCredentialsKey);
+      }
+    } catch {
+      pageError.value = 'Não foi possível atualizar as credenciais salvas no aparelho.';
+    }
     password.value = '';
     await loadWorkspaces();
     await loadAlertSoundPreference();
@@ -2980,6 +3041,8 @@ async function logout() {
     resetAccountSessionState();
     registrationEnabled.value = false;
     pageError.value = '';
+    if (rememberCredentialsEnabled.value) await loadRememberedCredentials();
+    else password.value = '';
   } catch (error) {
     pageError.value = error instanceof Error ? error.message : 'Nao foi possivel encerrar a sessao. Tente novamente.';
   }
@@ -3352,16 +3415,19 @@ onMounted(() => {
   const activationToken = query.get('activationToken');
   const rawInvitationToken = query.get('invitationToken');
   if (activationToken || rawInvitationToken) window.history.replaceState({}, '', window.location.pathname);
-  if (resetToken.value) {
-    loginMode.value = 'reset';
-    loading.value = false;
-  } else if (activationToken) {
-    void activateAccount(activationToken);
-  } else if (rawInvitationToken) {
-    void prepareInvitation(rawInvitationToken);
-  } else {
-    void checkSession();
-  }
+  void (async () => {
+    await loadRememberedCredentials();
+    if (resetToken.value) {
+      loginMode.value = 'reset';
+      loading.value = false;
+    } else if (activationToken) {
+      await activateAccount(activationToken);
+    } else if (rawInvitationToken) {
+      await prepareInvitation(rawInvitationToken);
+    } else {
+      await checkSession();
+    }
+  })();
   refreshTimer = setInterval(() => void loadDevices(), 30_000);
   window.addEventListener('scroll', syncMobileTab, { passive: true });
   window.addEventListener('hashchange', syncMobileTab);
@@ -3422,9 +3488,14 @@ onUnmounted(() => {
           <input id="email" v-model="email" type="email" autocomplete="username" :placeholder="language === 'en' ? 'you@laboratory.com' : 'voce@laboratorio.com'" required />
           <label for="password">{{ t('Senha') }}</label>
           <input id="password" v-model="password" type="password" autocomplete="current-password" :placeholder="t('Sua senha')" required />
+          <label v-if="rememberCredentialsAvailable" class="theme-setting remember-credentials-setting">
+            <span class="theme-setting-copy"><strong>{{ t('Salvar credenciais neste dispositivo') }}</strong><small>{{ t('Armazenadas com segurança neste aparelho.') }}</small></span>
+            <input v-model="rememberCredentialsEnabled" class="theme-switch" type="checkbox" :disabled="rememberCredentialsUpdating" @change="updateRememberCredentials" />
+          </label>
+          <p v-if="rememberCredentialsError" class="error-message" role="alert">{{ t(rememberCredentialsError) }}</p>
           <button class="text-button forgot-link" type="button" @click="loginMode = 'forgot'; forgotEmail = email">{{ t('Esqueci a senha') }}</button>
           <p v-if="loginError" class="error-message" role="alert">{{ loginError }}</p>
-          <button class="primary-button login-button" type="submit" :disabled="submitting">
+          <button class="primary-button login-button" type="submit" :disabled="submitting || rememberCredentialsUpdating">
             <LoaderCircle v-if="submitting" class="spin" :size="17" />
             <span>{{ submitting ? t('Entrando...') : t('Entrar') }}</span>
           </button>

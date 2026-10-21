@@ -45,7 +45,7 @@ const apkPath = resolve(androidDirectory, 'app/build/outputs/apk/release/app-rel
 const outputDirectory = resolve(androidDirectory, '../../../android');
 const outputPath = resolve(outputDirectory, 'app-release.apk');
 const gradleCommand = process.platform === 'win32'
-  ? 'gradlew.bat assembleRelease'
+  ? '.\\gradlew.bat assembleRelease'
   : 'bash ./gradlew assembleRelease';
 const buildEnvironment = {
   ...process.env,

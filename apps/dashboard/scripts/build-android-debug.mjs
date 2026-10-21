@@ -8,7 +8,7 @@ const apkPath = resolve(androidDirectory, 'app/build/outputs/apk/debug/app-debug
 const outputDirectory = resolve(androidDirectory, '../../../android');
 const outputPath = resolve(outputDirectory, 'app-debug.apk');
 const gradleCommand = process.platform === 'win32'
-  ? 'gradlew.bat assembleDebug'
+  ? '.\\gradlew.bat assembleDebug'
   : 'bash ./gradlew assembleDebug';
 
 execSync(gradleCommand, { cwd: androidDirectory, stdio: 'inherit' });

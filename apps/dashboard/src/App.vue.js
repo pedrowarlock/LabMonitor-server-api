@@ -1,4 +1,6 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { Capacitor } from '@capacitor/core';
+import { SecureStorage } from '@aparajita/capacitor-secure-storage';
 import { AsYouType, getCountries, getCountryCallingCode, parsePhoneNumberFromString } from 'libphonenumber-js';
 import MessageTemplateEditor from './components/MessageTemplateEditor.vue';
 import { Activity, AlertTriangle, ArrowDownToLine, Bell, Building2, Check, ChevronDown, ChevronLeft, ChevronRight, EllipsisVertical, Battery, Bot, CircleAlert, CircleCheck, CircleMinus, Clock3, Copy, Cpu, Flame, ImagePlus, LayoutDashboard, LockKeyhole, List, LoaderCircle, LogOut, Mail, MapPin, MessageCircle, Moon, Pencil, Play, Plus, RefreshCw, Search, Trash2, Settings, Share2, ShieldCheck, Signal, Sun, Thermometer, UsersRound, Volume2, Waves, X } from 'lucide-vue-next';
@@ -12,6 +14,11 @@ const notificationOpen = ref(false);
 const csrfToken = ref('');
 const email = ref('');
 const password = ref('');
+const rememberCredentialsEnabled = ref(false);
+const rememberCredentialsUpdating = ref(false);
+const rememberCredentialsError = ref('');
+const rememberCredentialsAvailable = Capacitor.isNativePlatform();
+const rememberedCredentialsKey = 'login-credentials';
 const registerName = ref('');
 const registerEmail = ref('');
 const registerPassword = ref('');
@@ -272,6 +279,10 @@ const englishText = {
     'Senha': 'Password',
     'Sua senha': 'Your password',
     'Esqueci a senha': 'Forgot password',
+    'Salvar credenciais neste dispositivo': 'Save credentials on this device',
+    'Armazenadas com segurança neste aparelho.': 'Stored securely on this device.',
+    'Não foi possível acessar o armazenamento seguro do aparelho.': 'Could not access this device’s secure storage.',
+    'Não foi possível atualizar as credenciais salvas no aparelho.': 'Could not update the credentials saved on this device.',
     'Entrando...': 'Signing in...',
     'Entrar': 'Sign in',
     'Sessao protegida com criptografia': 'Session protected with encryption',
@@ -881,6 +892,50 @@ const englishText = {
 };
 function t(text) {
     return language.value === 'en' ? englishText[text] ?? text : text;
+}
+function isRememberedCredentials(value) {
+    return typeof value === 'object'
+        && value !== null
+        && !Array.isArray(value)
+        && 'email' in value
+        && typeof value.email === 'string'
+        && 'password' in value
+        && typeof value.password === 'string';
+}
+async function loadRememberedCredentials() {
+    if (!rememberCredentialsAvailable)
+        return;
+    rememberCredentialsError.value = '';
+    try {
+        const savedCredentials = await SecureStorage.get(rememberedCredentialsKey);
+        if (savedCredentials === null)
+            return;
+        if (!isRememberedCredentials(savedCredentials))
+            throw new Error('Invalid saved credentials');
+        email.value = savedCredentials.email;
+        password.value = savedCredentials.password;
+        rememberCredentialsEnabled.value = true;
+    }
+    catch {
+        rememberCredentialsError.value = 'Não foi possível acessar o armazenamento seguro do aparelho.';
+    }
+}
+async function updateRememberCredentials() {
+    rememberCredentialsError.value = '';
+    if (rememberCredentialsEnabled.value || !rememberCredentialsAvailable || rememberCredentialsUpdating.value)
+        return;
+    rememberCredentialsUpdating.value = true;
+    try {
+        await SecureStorage.remove(rememberedCredentialsKey);
+        password.value = '';
+    }
+    catch {
+        rememberCredentialsEnabled.value = true;
+        rememberCredentialsError.value = 'Não foi possível acessar o armazenamento seguro do aparelho.';
+    }
+    finally {
+        rememberCredentialsUpdating.value = false;
+    }
 }
 function interpolateNotificationTemplate(template, senderName, status) {
     const values = {
@@ -2453,6 +2508,7 @@ async function retryServerConnection() {
 async function login() {
     submitting.value = true;
     loginError.value = '';
+    rememberCredentialsError.value = '';
     try {
         const result = await api('/api/auth/login', {
             method: 'POST',
@@ -2462,6 +2518,17 @@ async function login() {
         user.value = result.user;
         csrfToken.value = result.csrfToken;
         syncProfileForm();
+        try {
+            if (rememberCredentialsAvailable && rememberCredentialsEnabled.value) {
+                await SecureStorage.set(rememberedCredentialsKey, { email: email.value, password: password.value });
+            }
+            else if (rememberCredentialsAvailable) {
+                await SecureStorage.remove(rememberedCredentialsKey);
+            }
+        }
+        catch {
+            pageError.value = 'Não foi possível atualizar as credenciais salvas no aparelho.';
+        }
         password.value = '';
         await loadWorkspaces();
         await loadAlertSoundPreference();
@@ -2966,6 +3033,10 @@ async function logout() {
         resetAccountSessionState();
         registrationEnabled.value = false;
         pageError.value = '';
+        if (rememberCredentialsEnabled.value)
+            await loadRememberedCredentials();
+        else
+            password.value = '';
     }
     catch (error) {
         pageError.value = error instanceof Error ? error.message : 'Nao foi possivel encerrar a sessao. Tente novamente.';
@@ -3355,19 +3426,22 @@ onMounted(() => {
     const rawInvitationToken = query.get('invitationToken');
     if (activationToken || rawInvitationToken)
         window.history.replaceState({}, '', window.location.pathname);
-    if (resetToken.value) {
-        loginMode.value = 'reset';
-        loading.value = false;
-    }
-    else if (activationToken) {
-        void activateAccount(activationToken);
-    }
-    else if (rawInvitationToken) {
-        void prepareInvitation(rawInvitationToken);
-    }
-    else {
-        void checkSession();
-    }
+    void (async () => {
+        await loadRememberedCredentials();
+        if (resetToken.value) {
+            loginMode.value = 'reset';
+            loading.value = false;
+        }
+        else if (activationToken) {
+            await activateAccount(activationToken);
+        }
+        else if (rawInvitationToken) {
+            await prepareInvitation(rawInvitationToken);
+        }
+        else {
+            await checkSession();
+        }
+    })();
     refreshTimer = setInterval(() => void loadDevices(), 30000);
     window.addEventListener('scroll', syncMobileTab, { passive: true });
     window.addEventListener('hashchange', syncMobileTab);
@@ -3557,6 +3631,32 @@ else if (!__VLS_ctx.user) {
             required: true,
         });
         (__VLS_ctx.password);
+        if (__VLS_ctx.rememberCredentialsAvailable) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+                ...{ class: "theme-setting remember-credentials-setting" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "theme-setting-copy" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+            (__VLS_ctx.t('Salvar credenciais neste dispositivo'));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+            (__VLS_ctx.t('Armazenadas com segurança neste aparelho.'));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+                ...{ onChange: (__VLS_ctx.updateRememberCredentials) },
+                ...{ class: "theme-switch" },
+                type: "checkbox",
+                disabled: (__VLS_ctx.rememberCredentialsUpdating),
+            });
+            (__VLS_ctx.rememberCredentialsEnabled);
+        }
+        if (__VLS_ctx.rememberCredentialsError) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+                ...{ class: "error-message" },
+                role: "alert",
+            });
+            (__VLS_ctx.t(__VLS_ctx.rememberCredentialsError));
+        }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
             ...{ onClick: (...[$event]) => {
                     if (!!(__VLS_ctx.loading))
@@ -3584,7 +3684,7 @@ else if (!__VLS_ctx.user) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
             ...{ class: "primary-button login-button" },
             type: "submit",
-            disabled: (__VLS_ctx.submitting),
+            disabled: (__VLS_ctx.submitting || __VLS_ctx.rememberCredentialsUpdating),
         });
         if (__VLS_ctx.submitting) {
             const __VLS_8 = {}.LoaderCircle;
@@ -11776,6 +11876,11 @@ else {
 /** @type {__VLS_StyleScopedClasses['form-subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['success-message']} */ ;
 /** @type {__VLS_StyleScopedClasses['error-message']} */ ;
+/** @type {__VLS_StyleScopedClasses['theme-setting']} */ ;
+/** @type {__VLS_StyleScopedClasses['remember-credentials-setting']} */ ;
+/** @type {__VLS_StyleScopedClasses['theme-setting-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['theme-switch']} */ ;
+/** @type {__VLS_StyleScopedClasses['error-message']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['forgot-link']} */ ;
 /** @type {__VLS_StyleScopedClasses['error-message']} */ ;
@@ -12680,6 +12785,10 @@ const __VLS_self = (await import('vue')).defineComponent({
             notificationOpen: notificationOpen,
             email: email,
             password: password,
+            rememberCredentialsEnabled: rememberCredentialsEnabled,
+            rememberCredentialsUpdating: rememberCredentialsUpdating,
+            rememberCredentialsError: rememberCredentialsError,
+            rememberCredentialsAvailable: rememberCredentialsAvailable,
             registerName: registerName,
             registerEmail: registerEmail,
             registerPassword: registerPassword,
@@ -12856,6 +12965,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             deviceHistories: deviceHistories,
             deviceTimelines: deviceTimelines,
             t: t,
+            updateRememberCredentials: updateRememberCredentials,
             workspaceRoleLabel: workspaceRoleLabel,
             dateLocale: dateLocale,
             reportDate: reportDate,
